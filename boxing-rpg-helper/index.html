@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Boxing RPG — Dice & Combat Helper</title>
+<style>
+  :root{
+    --bg:#0f1222; --panel:#171a2e; --muted:#8ea1b3; --text:#f3f6ff;
+    --acc:#58a6ff; --good:#4cd97b; --bad:#ff6b6b; --warn:#ffc857;
+    --chip:#232747; --btn:#1f2345; --btn-hi:#2a2f63;
+    --card:#11142a; --br:16px; --shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:linear-gradient(180deg,#0d1020, #0a0d1a 45%, #090c18 100%);
+    color:var(--text); font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+  }
+  header{
+    position:sticky; top:0; z-index:5; backdrop-filter:saturate(140%) blur(8px);
+    background:rgba(9,12,24,.65); border-bottom:1px solid #1f2345;
+    padding:14px 16px; display:flex; gap:14px; align-items:center;
+  }
+  header h1{font-size:18px; margin:0; font-weight:700; letter-spacing:.3px}
+  .grid{
+    display:grid; gap:16px; padding:16px; grid-template-columns: 340px 1fr 380px;
+  }
+  @media (max-width:1200px){ .grid{grid-template-columns:1fr} }
+  .card{
+    background:var(--panel); border:1px solid #1f2345; border-radius:var(--br);
+    box-shadow:var(--shadow);
+  }
+  .card h2, .card h3{margin:0 0 10px 0; font-size:16px}
+  .card .body{padding:14px}
+  .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  .col{display:flex; flex-direction:column; gap:8px}
+  label{font-size:12px; color:var(--muted)}
+  input[type="text"], input[type="number"], select, textarea{
+    width:100%; background:var(--card); color:var(--text);
+    border:1px solid #232747; border-radius:10px; padding:8px 10px;
+    outline:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+  }
+  textarea{min-height:120px; resize:vertical}
+  .btn{
+    background:var(--btn); color:var(--text); border:1px solid #2a2f63;
+    padding:8px 12px; border-radius:12px; cursor:pointer; font-weight:600;
+    transition:transform .06s ease, background .15s ease;
+  }
+  .btn:hover{background:var(--btn-hi)}
+  .btn:active{transform:translateY(1px)}
+  .btn.good{border-color:#2a5c46; background:#183427}
+  .btn.bad{border-color:#5a2b2b; background:#341b1b}
+  .btn.warn{border-color:#5c4c2a; background:#352c18}
+  .chip{
+    background:var(--chip); border:1px solid #2a2f63; padding:6px 10px; border-radius:999px;
+    font-size:12px; color:#c8d7ff;
+  }
+  .stat{
+    background:var(--card); padding:8px; border-radius:12px; border:1px solid #232747;
+    display:grid; grid-template-columns: 1fr auto auto; gap:8px; align-items:center;
+  }
+  .stat .name{font-size:12px; color:#bcd0ff}
+  .digit{font-feature-settings:"tnum" 1,"lnum" 1; letter-spacing:.2px}
+  .spaced{display:flex; justify-content:space-between; align-items:center; gap:8px}
+  .dial{display:flex; gap:8px; align-items:center}
+  .dial input[type="range"]{width:160px}
+  .divider{height:1px; background:#232747; margin:8px 0 12px}
+  .log{
+    font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:#0b0e1b; border-top:1px solid #1f2345; padding:10px 12px; max-height:360px; overflow:auto;
+  }
+  .log b{color:#bfe1ff}
+  .tag{padding:2px 6px; border-radius:6px; font-size:11px; border:1px solid #2a2f63; background:#14183a}
+  .flex{display:flex; gap:10px; flex-wrap:wrap}
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .pill{background:#11142a; padding:8px 10px; border:1px solid #232747; border-radius:999px;}
+  .kbd{border:1px solid #3b3f6b; background:#0c0f22; padding:2px 6px; border-radius:6px; font-size:11px; color:#c3d1ff}
+  .hl{color:var(--good)}
+  .danger{color:var(--bad)}
+  .tiny{font-size:11px; color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🥊 Boxing RPG — Dice & Combat Helper (GM‑less)</h1>
+  <span class="chip">Tempo → Only the winner acts; other reacts</span>
+  <span class="chip">0 Stamina = −2 to all rolls</span>
+  <span class="chip">Counter triggers on Defense win ≥ +3</span>
+</header>
+
+<div class="grid">
+  <!-- LEFT: Character import & modifiers -->
+  <section class="card">
+    <div class="body">
+      <h2>Fighters & Import</h2>
+      <div class="split">
+        <div class="col">
+          <label>Paste Character Sheet (You)</label>
+          <textarea id="youSheet" placeholder="🇺🇸 Name “Nickname” Surname (Weight Class)
+HP: 12 | Stamina: 10 | Power: 3 | Speed: 3 | Defense: 3 | IQ: 2 | Personality: 2"></textarea>
+          <button class="btn" id="importYou">Import You</button>
+        </div>
+        <div class="col">
+          <label>Paste Character Sheet (Opponent)</label>
+          <textarea id="oppSheet" placeholder="🇯🇵 Name “Nickname” Surname (Weight Class)
+HP: 12 | Stamina: 10 | Power: 3 | Speed: 3 | Defense: 3 | IQ: 2 | Personality: 2"></textarea>
+          <button class="btn" id="importOpp">Import Opponent</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <h3>Global Roll Modifiers</h3>
+      <div class="row">
+        <div class="dial">
+          <span class="tag">Adv/Dis</span>
+          <input type="range" id="advDial" min="-3" max="3" value="0" />
+          <span id="advDialVal" class="digit">0</span>
+        </div>
+        <div class="dial">
+          <span class="tag">Zone</span>
+          <select id="zone">
+            <option value="0|0">Center (+0 / +0)</option>
+            <option value="1|-1">Mid-Ring (Atk +1 / Def −1)</option>
+            <option value="2|-2">Ropes (Atk +2 / Def −2)</option>
+            <option value="3|corner">Corner (Atk +3 / Def disadvantage)</option>
+          </select>
+        </div>
+        <div class="dial">
+          <span class="tag">Per-Stat Temp Mods</span>
+          <select id="modStat">
+            <option>Power</option><option>Speed</option><option>Defense</option>
+            <option>IQ</option><option>Personality</option>
+          </select>
+          <input type="number" id="modValue" value="0" step="1" style="width:90px" />
+          <button class="btn warn" id="applyMod">Apply ±</button>
+          <button class="btn" id="clearMods">Clear Mods</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MIDDLE: Board -->
+  <section class="card">
+    <div class="body">
+      <div class="spaced">
+        <h2>Fight Board</h2>
+        <div class="row">
+          <span class="pill">Round <span id="roundNum" class="digit">1</span></span>
+          <span class="pill">Minute <span id="minuteNum" class="digit">1</span> / 3</span>
+          <span class="pill">Counters this Minute: <span id="counterUsed" class="digit">0</span> / 3</span>
+          <button class="btn" id="nextMinute">Next Minute</button>
+          <button class="btn warn" id="cornerPhase">Corner Phase</button>
+          <button class="btn bad" id="resetFight">Reset</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="split">
+        <div>
+          <h3>Your Stats</h3>
+          <div id="youStats"></div>
+          <div class="row">
+            <span class="tag">Edge: <b id="youEdge" class="digit">0</b></span>
+          </div>
+        </div>
+        <div>
+          <h3>Opponent Stats</h3>
+          <div id="oppStats"></div>
+          <div class="row">
+            <span class="tag">Edge: <b id="oppEdge" class="digit">0</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <button class="btn" id="rollTempo"><b>Roll Tempo</b> (2d6 + Speed)</button>
+        <span class="chip">Tempo: <b id="tempoOwner">None</b></span>
+        <span class="tiny">Tie → both −1 Stamina, reroll.</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="split">
+        <div>
+          <h3>Action (Tempo Winner)</h3>
+          <div class="row">
+            <select id="actionType">
+              <option value="attack">Attack Combo</option>
+              <option value="taunt">Taunt</option>
+              <option value="iq">IQ Study</option>
+              <option value="move">Move</option>
+              <option value="recover">Recover (catch breath)</option>
+            </select>
+
+            <!-- Attack builder -->
+            <span class="tag">Build Combo:</span>
+            <select id="strikeSel">
+              <option value="jab">Jab (1 Sta, 1 DMG)</option>
+              <option value="cross">Cross (2 Sta, 2 DMG)</option>
+              <option value="hook">Hook (2 Sta, 2 DMG)</option>
+              <option value="uppercut">Uppercut (3 Sta, 3 DMG)</option>
+              <option value="heavy">Heavy (3 Sta, 3 DMG)</option>
+            </select>
+            <button class="btn" id="addStrike">Add Strike</button>
+            <button class="btn bad" id="clearCombo">Clear</button>
+          </div>
+          <div class="row tiny">
+            <span>Combo:</span> <span id="comboPreview" class="chip">—</span>
+          </div>
+          <div class="row">
+            <button class="btn good" id="doAction">Execute Action</button>
+          </div>
+        </div>
+
+        <div>
+          <h3>Reaction (Defender)</h3>
+          <div class="row">
+            <span class="tag">Defense auto‑rolls vs each strike</span>
+            <span class="tag">Win by +3 → Counter; +5 → Perfect Counter (+1 dmg)</span>
+          </div>
+          <div class="row">
+            <button class="btn" id="forceCounter" title="Manual counter if needed">Manual Counter</button>
+            <button class="btn" id="useEdge">Use Edge (re‑roll one die)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <h3>Combat Log</h3>
+        <button class="btn" id="clearLog" style="margin-left:auto">Clear Log</button>
+      </div>
+      <div id="log" class="log" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Quick tools -->
+  <section class="card">
+    <div class="body">
+      <h2>Quick Tools</h2>
+      <div class="split">
+        <div class="col">
+          <label>Roll: 2d6</label>
+          <button class="btn" onclick="debugRoll(2,6)">Roll 2d6</button>
+        </div>
+        <div class="col">
+          <label>Roll: 1d6</label>
+          <button class="btn" onclick="debugRoll(1,6)">Roll 1d6</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <h3>Corner Phase</h3>
+      <div class="tiny">Standard: Roll 1d6 → HP +⌊d6/2⌋ (max +3), Stamina +d6 (cap 10). Coach Advice d3: +Speed / +Defense / +Stamina for next round.</div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" onclick="runCorner('you')">Your Corner</button>
+        <button class="btn" onclick="runCorner('opp')">Opp Corner</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <h3>Status Toggles</h3>
+      <div class="row">
+        <button class="btn" onclick="toggleZeroStamina('you')">Toggle You: 0 Stamina Penalty</button>
+        <button class="btn" onclick="toggleZeroStamina('opp')">Toggle Opp: 0 Stamina Penalty</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------- Utility Dice ---------- */
+const R = (n) => Math.floor(Math.random()*n)+1;
+function rollXdY(x,y){ let t=0; const rolls=[]; for(let i=0;i<x;i++){ const v=R(y); t+=v; rolls.push(v);} return {total:t,rolls}; }
+function advDisDice(twoD6, cornerDisadv=false){
+  // Corner disadvantage for defender: roll 3d6, drop highest
+  if(cornerDisadv){ const r = rollXdY(3,6).rolls.sort((a,b)=>a-b); return { total: r[0]+r[1], rolls:r, note:"(3d6 drop high)" };}
+  return twoD6;
+}
+
+/* ---------- Game State ---------- */
+const baseFighter = ()=>({
+  name:"Unnamed", HP:12, Stamina:10, Power:3, Speed:3, Defense:3, IQ:2, Personality:2,
+  tempMods:{Power:0,Speed:0,Defense:0,IQ:0,Personality:0},
+  edge:0, zeroPenalty:false
+});
+const state = {
+  you: baseFighter(),
+  opp: baseFighter(),
+  round:1, minute:1, tempo:"None", combo:[],
+  advDial:0, zoneAtk:0, zoneDef:0, defCornerDisadv:false,
+  countersThisMinute:0
+};
+
+const id = (x)=>document.getElementById(x);
+const logEl = id('log');
+function log(msg){ logEl.innerHTML += msg + "<br/>"; logEl.scrollTop = logEl.scrollHeight; }
+function setText(el,val){ el.textContent = val; }
+
+/* ---------- Sheet Import ---------- */
+function parseSheet(text){
+  // Accepts the provided format, tolerant to spacing: HP: ## | Stamina: ## | ...
+  const o = baseFighter();
+  const firstLine = (text.split("\n").find(l=>l.trim().length>0)||"").trim();
+  o.name = firstLine.replace(/^🇺🇸|🇯🇵|🇧🇷|🇲🇽|🇨🇺|🇬🇧|🇪🇸|\s+/g,' ').trim() || "Unnamed";
+  const map = {hp:"HP", stamina:"Stamina", power:"Power", speed:"Speed", defense:"Defense", iq:"IQ", personality:"Personality"};
+  for(const [k,label] of Object.entries(map)){
+    const re = new RegExp(`${label}\\s*:\\s*(\\d+)`,"i");
+    const m = text.match(re);
+    if(m) o[label] = parseInt(m[1],10);
+  }
+  return o;
+}
+
+function renderStats(){
+  function block(f, side){
+    const zero = f.Stamina<=0;
+    const rows = [
+      ["HP", f.HP], ["Stamina", f.Stamina + (zero ? " (0!)" : "")],
+      ["Power", f.Power + modStr(f, "Power")], ["Speed", f.Speed + modStr(f, "Speed")],
+      ["Defense", f.Defense + modStr(f, "Defense")], ["IQ", f.IQ + modStr(f, "IQ")],
+      ["Personality", f.Personality + modStr(f,"Personality")]
+    ].map(([k,v]) => `
+      <div class="stat">
+        <div class="name">${k}</div>
+        <div class="digit">${v}</div>
+        ${["HP","Stamina"].includes(k)?`<div></div>`:
+          `<div class="row" style="justify-content:flex-end">
+            <button class="btn" onclick="adjStat('${side}','${k}',+1)">+1</button>
+            <button class="btn bad" onclick="adjStat('${side}','${k}',-1)">-1</button>
+          </div>`
+        }
+      </div>
+    `).join("");
+    return rows;
+  }
+  id('youStats').innerHTML = block(state.you,"you");
+  id('oppStats').innerHTML = block(state.opp,"opp");
+  id('youEdge').textContent = state.you.edge;
+  id('oppEdge').textContent = state.opp.edge;
+  id('roundNum').textContent = state.round;
+  id('minuteNum').textContent = state.minute;
+  id('counterUsed').textContent = state.countersThisMinute;
+  id('tempoOwner').textContent = state.tempo;
+  id('advDialVal').textContent = state.advDial;
+}
+
+function modStr(f, key){ const m = f.tempMods[key]||0; return m===0?"":` (${m>=0?"+":""}${m})`; }
+function adjStat(side,key,delta){
+  const f = state[side];
+  if(key==="HP"||key==="Stamina"){
+    f[key] = Math.max(0, f[key]+delta);
+  }else{
+    f[key] = Math.max(0, f[key]+delta);
+  }
+  renderStats();
+}
+
+/* ---------- Global Controls ---------- */
+id('importYou').onclick = ()=>{
+  state.you = {...state.you, ...parseSheet(id('youSheet').value)};
+  log(`<b>Imported YOU</b>: ${state.you.name}`);
+  renderStats();
+};
+id('importOpp').onclick = ()=>{
+  state.opp = {...state.opp, ...parseSheet(id('oppSheet').value)};
+  log(`<b>Imported OPP</b>: ${state.opp.name}`);
+  renderStats();
+};
+
+id('advDial').oninput = (e)=>{ state.advDial = parseInt(e.target.value,10); renderStats(); };
+id('zone').onchange = (e)=>{
+  const [atk,def] = e.target.value.split('|');
+  state.zoneAtk = parseInt(atk,10);
+  state.defCornerDisadv = (def==="corner");
+  state.zoneDef = def==="corner" ? 0 : parseInt(def,10);
+  log(`<span class="tag">Zone</span> Atk ${state.zoneAtk>=0?'+':''}${state.zoneAtk} / Def ${state.defCornerDisadv?'disadv (3d6 drop high)':(state.zoneDef>=0?'+':'')+state.zoneDef}`);
+};
+
+id('applyMod').onclick = ()=>{
+  const stat = id('modStat').value; const v = parseInt(id('modValue').value,10)||0;
+  state.you.tempMods[stat] = (state.you.tempMods[stat]||0)+v;
+  state.opp.tempMods[stat] = (state.opp.tempMods[stat]||0)+v;
+  log(`<b>Temp Mod</b>: ${stat} ${v>=0?'+':''}${v} applied to both fighters.`);
+  renderStats();
+};
+id('clearMods').onclick = ()=>{
+  state.you.tempMods = {Power:0,Speed:0,Defense:0,IQ:0,Personality:0};
+  state.opp.tempMods = {Power:0,Speed:0,Defense:0,IQ:0,Personality:0};
+  log(`<b>Cleared</b> all temp stat mods.`);
+  renderStats();
+};
+
+id('resetFight').onclick = ()=>{
+  state.you = baseFighter(); state.opp = baseFighter();
+  state.round=1; state.minute=1; state.tempo="None"; state.combo=[]; state.advDial=0; state.zoneAtk=0; state.zoneDef=0; state.defCornerDisadv=false;
+  state.countersThisMinute=0; id('advDial').value=0; id('zone').value="0|0"; id('comboPreview').textContent='—';
+  logEl.innerHTML = "";
+  renderStats();
+};
+
+id('nextMinute').onclick = ()=>{
+  state.minute++; state.countersThisMinute=0; state.tempo="None";
+  if(state.minute>3){ state.minute=1; state.round++; log(`<b>New Round ${state.round}</b>`); }
+  renderStats();
+};
+
+function toggleZeroStamina(side){
+  const f = state[side];
+  f.zeroPenalty = !f.zeroPenalty;
+  log(`<b>${side.toUpperCase()}</b> 0 Stamina penalty is now ${f.zeroPenalty?'ON (−2 to all rolls)':'OFF'}.`);
+}
+
+/* ---------- Tempo ---------- */
+id('rollTempo').onclick = ()=>{
+  const atk = state.you, def = state.opp;
+  const a = roll2d6WithMods(atk,'Speed', false);
+  const b = roll2d6WithMods(def,'Speed', false);
+  log(`Tempo — You: <b>${a.total}</b> vs Opp: <b>${b.total}</b>`);
+  if(a.total===b.total){
+    atk.Stamina = Math.max(0, atk.Stamina-1);
+    def.Stamina = Math.max(0, def.Stamina-1);
+    log(`<span class="danger">Tie!</span> Both lose 1 Stamina. Reroll.`);
+    renderStats();
+    return;
+  }
+  state.tempo = a.total>b.total ? "You" : "Opp";
+  renderStats();
+};
+
+/* ---------- Rolls with advantage & penalties ---------- */
+function totalStat(f, stat){
+  return (f[stat]||0) + (f.tempMods?.[stat]||0);
+}
+function penalty(f){ return (f.zeroPenalty || f.Stamina<=0) ? -2 : 0; }
+function roll2d6WithMods(f, stat, isDefense, overrideCornerDef=false){
+  const adv = state.advDial; // global (kept simple; could expand to actual adv dice logic)
+  const base = rollXdY(2,6);
+  const cornerDisadv = (isDefense && state.defCornerDisadv && !overrideCornerDef);
+  const picked = advDisDice(base, cornerDisadv);
+  const mod = totalStat(f,stat) + penalty(f) + (isDefense? state.zoneDef: state.zoneAtk);
+  return { ...picked, total: picked.total + mod, mod, advNote: cornerDisadv?picked.note:"" };
+}
+
+/* ---------- Actions ---------- */
+const strikeCost = { jab:1, cross:2, hook:2, uppercut:3, heavy:3 };
+const strikeDmg  = { jab:1, cross:2, hook:2, uppercut:3, heavy:3 };
+
+id('addStrike').onclick = ()=>{
+  const s = id('strikeSel').value;
+  state.combo.push(s);
+  id('comboPreview').textContent = state.combo.map(x=>x[0].toUpperCase()+x.slice(1)).join(' → ');
+};
+id('clearCombo').onclick = ()=>{ state.combo = []; id('comboPreview').textContent='—'; };
+
+id('doAction').onclick = ()=>{
+  if(state.tempo==="None"){ log(`<span class="danger">Roll Tempo first.</span>`); return; }
+  const actorSide = state.tempo==="You" ? "you" : "opp";
+  const defSide   = state.tempo==="You" ? "opp" : "you";
+  const act = id('actionType').value;
+
+  if(act==="attack"){ doAttack(actorSide, defSide); return; }
+  if(act==="taunt"){ doTaunt(actorSide, defSide); return; }
+  if(act==="iq"){ doIQ(actorSide, defSide); return; }
+  if(act==="move"){ doMove(actorSide); return; }
+  if(act==="recover"){ doRecover(actorSide); return; }
+};
+
+function spendStamina(f, amt){
+  f.Stamina = Math.max(0, f.Stamina - amt);
+  if(f.Stamina<=0){ f.zeroPenalty = true; }
+}
+
+function doAttack(actorSide, defSide){
+  const A = state[actorSide], D = state[defSide];
+  if(state.combo.length===0){ log(`<span class="danger">Build a combo first.</span>`); return; }
+
+  // Check cost
+  const totalCost = state.combo.reduce((a,s)=>a+strikeCost[s],0);
+  if(A.Stamina < totalCost){ log(`<span class="danger">${A.name} lacks stamina for this combo (needs ${totalCost}).</span>`); return; }
+
+  log(`<b>${A.name}</b> declares: <span class="hl">${state.combo.map(x=>x).join(' → ')}</span> (cost ${totalCost})`);
+
+  let totalDamage = 0, strikesLanded = 0;
+  for(let i=0;i<state.combo.length;i++){
+    const s = state.combo[i];
+
+    // Pay stamina per strike
+    spendStamina(A, strikeCost[s]);
+
+    // Attack vs Defense
+    const atkRoll = roll2d6WithMods(A,'Power', false);
+    const defRoll = roll2d6WithMods(D,'Defense', true);
+
+    log(`Strike ${i+1}: ${s.toUpperCase()} — Attk <b>${atkRoll.total}</b> (2d6${atkRoll.advNote?' '+atkRoll.advNote:''} + Pow ${totalStat(A,'Power')} ${penalty(A)?'−2 pen':''} + Zone ${state.zoneAtk>=0?'+':''}${state.zoneAtk}) vs Def <b>${defRoll.total}</b> (2d6${defRoll.advNote?' '+defRoll.advNote:''} + Def ${totalStat(D,'Defense')} ${penalty(D)?'−2 pen':''} ${state.defCornerDisadv?'Corner dis.':''} ${state.zoneDef>=0?'+':''}${state.zoneDef})`);
+
+    if(atkRoll.total > defRoll.total){
+      // Land!
+      strikesLanded++;
+      totalDamage += strikeDmg[s];
+      log(`<span class="hl">Hit!</span> ${strikeDmg[s]} damage.`);
+    }else{
+      // Blocked/Evaded: Defender regains +1 Stamina on successful defense
+      D.Stamina = Math.min(10, D.Stamina + 1);
+      const margin = defRoll.total - atkRoll.total;
+      log(`<span class="danger">Miss/Block</span> (Def +${margin}). Defender +1 Stamina.`);
+      if(margin >= 3){
+        // Counter trigger (limit 3 per minute)
+        if(state.countersThisMinute < 3){
+          state.countersThisMinute++;
+          const perfect = margin >= 5;
+          doCounter(defSide, actorSide, perfect);
+        }else{
+          log(`<span class="tiny">Counter limit reached this minute.</span>`);
+        }
+      }
+      // Combo ends on first miss
+      break;
+    }
+  }
+
+  if(totalDamage>0){
+    D.HP = Math.max(0, D.HP - totalDamage);
+    log(`<b>Total Damage:</b> ${totalDamage}. ${D.name} HP now ${D.HP}.`);
+  }
+
+  // End of minute if an Attack action was taken (per game flow)
+  log(`<span class="tag">Minute ends due to Attack action.</span>`);
+  renderStats();
+}
+
+function doCounter(actorSide, defSide, perfect){
+  const A = state[actorSide], D = state[defSide];
+  // Default counter is a jab; low-HP restriction handled by same choice
+  const choice = 'jab';
+  spendStamina(A, strikeCost[choice]); // jab = 1
+  const atkRoll = roll2d6WithMods(A,'Power', false, /*overrideCornerDef*/ true);
+  const defRoll = roll2d6WithMods(D,'Defense', true);
+
+  const dmg = strikeDmg[choice] + (perfect ? 1 : 0);
+  log(`<b>Counter!</b> ${A.name} throws ${choice.toUpperCase()} ${perfect?'+1 dmg':''} — Attk <b>${atkRoll.total}</b> vs Def <b>${defRoll.total}</b>`);
+  if(atkRoll.total > defRoll.total){
+    D.HP = Math.max(0, D.HP - dmg);
+    log(`<span class="hl">Counter lands</span> for ${dmg} dmg. ${D.name} HP ${D.HP}.`);
+  }else{
+    D.Stamina = Math.min(10, D.Stamina + 1);
+    log(`<span class="tiny">Counter blocked — Defender +1 Stamina.</span>`);
+  }
+}
+
+function doTaunt(actorSide, defSide){
+  const A = state[actorSide], D = state[defSide];
+  // Opposed Personality
+  const a = roll2d6WithMods(A,'Personality', false);
+  const d = roll2d6WithMods(D,'Personality', false);
+  log(`<b>Taunt:</b> ${A.name} ${a.total} vs ${D.name} ${d.total}`);
+  if(a.total>d.total){
+    const margin = a.total-d.total;
+    let effect = "-1 on next roll";
+    if(margin>=5) effect = "-2 for rest of round";
+    else if(margin>=3) effect = "-1 for rest of minute";
+    log(`<span class="hl">Taunt succeeds</span> → ${D.name} ${effect}.`);
+  }else if(a.total===d.total){
+    log(`Taunt standoff. No effect.`);
+  }else{
+    spendStamina(A,1);
+    log(`<span class="danger">Taunt fails</span> → ${A.name} loses 1 Stamina.`);
+  }
+  renderStats();
+}
+
+function doIQ(actorSide, defSide){
+  const A = state[actorSide], D = state[defSide];
+  const a = roll2d6WithMods(A,'IQ', false);
+  const d = roll2d6WithMods(D,'IQ', false);
+  log(`<b>IQ Study:</b> ${A.name} ${a.total} vs ${D.name} ${d.total}`);
+  if(a.total>d.total){
+    const margin = a.total-d.total;
+    const gain = margin>=5 ? 2 : 1;
+    A.edge += gain;
+    log(`<span class="hl">IQ success</span> → ${A.name} gains ${gain} Edge token${gain>1?'s':''}.`);
+  }else{
+    log(`No insight gained.`);
+  }
+  renderStats();
+}
+
+function doMove(actorSide){
+  const A = state[actorSide];
+  spendStamina(A,1);
+  log(`${A.name} moves (−1 Stamina).`);
+  renderStats();
+}
+function doRecover(actorSide){
+  const A = state[actorSide];
+  const r = rollXdY(1,6).total;
+  const gain = Math.min(10 - A.Stamina, r);
+  A.Stamina += gain;
+  log(`${A.name} recovers Stamina: +${gain} (rolled ${r}).`);
+  renderStats();
+}
+
+/* ---------- Reactions ---------- */
+id('forceCounter').onclick = ()=>{
+  if(state.tempo==="None"){ log(`No active exchange to counter.`); return; }
+  const actorSide = state.tempo==="You" ? "opp" : "you"; // Defender is opposite the actor
+  const defSide   = state.tempo==="You" ? "you" : "opp";
+  if(state.countersThisMinute>=3){ log(`Counter limit reached for this minute.`); return; }
+  state.countersThisMinute++;
+  doCounter(actorSide, defSide, false);
+  renderStats();
+};
+
+id('useEdge').onclick = ()=>{
+  const side = state.tempo==="You" ? "you" : "opp";
+  const f = state[side];
+  if(f.edge<=0){ log(`No Edge tokens.`); return; }
+  f.edge -= 1;
+  log(`<b>${f.name}</b> burns an Edge token for a reroll on the next roll (apply manually).`);
+  renderStats();
+};
+
+/* ---------- Corner Phase ---------- */
+function runCorner(side){
+  const F = state[side];
+  const d6 = rollXdY(1,6).total;
+  const hpGain = Math.min(3, Math.floor(d6/2));
+  const staGain = Math.min(10 - F.Stamina, d6);
+  F.HP += hpGain;
+  F.Stamina += staGain;
+  if(F.Stamina>0) F.zeroPenalty = false;
+
+  const coach = R(3);
+  let coachNote = coach===1?'+Speed next round':coach===2?'+Defense next round':'+Stamina next round';
+  log(`<b>Corner (${F.name})</b> — d6=${d6} → HP +${hpGain}, Sta +${staGain}. Coach: ${coachNote}.`);
+  renderStats();
+}
+
+id('cornerPhase').onclick = ()=>{
+  log(`<b>— Corner Phase —</b> Use the right‑panel buttons to roll each corner.`);
+};
+
+/* ---------- Quick Dice ---------- */
+function debugRoll(x,y){
+  const {total, rolls} = rollXdY(x,y);
+  log(`<b>${x}d${y}</b> → [${rolls.join(', ')}] = <b>${total}</b>`);
+}
+
+/* ---------- Init ---------- */
+renderStats();
+</script>
+</body>
+</html>
